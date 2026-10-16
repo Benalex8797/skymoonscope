@@ -30,6 +30,7 @@ function getDurationTierMultiplier(months) {
   if (months <= 6) return 1.1 + (months - 3) * (0.15 / 3);
   if (months <= 12) return 1.25 + (months - 6) * (0.25 / 6);
   if (months <= 24) return 1.5 + (months - 12) * (0.25 / 12);
+  if (months <= 36) return 1.75 + (months - 24) * (0.25 / 12);
   return 2.0;
 }
 

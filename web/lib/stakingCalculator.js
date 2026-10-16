@@ -42,6 +42,7 @@ function calculateStakingYield({
   compoundFrequency = 'monthly',
   baseApyPercentage = 12,
   enableTierMultiplier = true,
+  stakeLockWarningThreshold = null,
 } = {}) {
   const P = Math.max(0, Number(depositAmount) || 0);
   const months = Math.max(1, Number(lockDurationMonths) || 1);
@@ -92,6 +93,11 @@ function calculateStakingYield({
     });
   }
 
+  const threshold = stakeLockWarningThreshold !== null && stakeLockWarningThreshold !== undefined
+    ? Number(stakeLockWarningThreshold)
+    : null;
+  const showStakeLockWarning = threshold !== null && !Number.isNaN(threshold) && effectiveApyPercent < threshold;
+
   return {
     depositAmount: P,
     lockDurationMonths: months,
@@ -106,6 +112,8 @@ function calculateStakingYield({
     estimatedDailyYield: Number(estimatedDailyYield.toFixed(4)),
     estimatedMonthlyYield: Number(estimatedMonthlyYield.toFixed(2)),
     breakdownByMonth,
+    stakeLockWarningThreshold: threshold,
+    showStakeLockWarning,
   };
 }
 

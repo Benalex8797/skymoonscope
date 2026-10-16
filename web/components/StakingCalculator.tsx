@@ -21,7 +21,9 @@ export function StakingCalculator({
   onStakeLockWarningChange,
 }: StakingCalculatorProps) {
   const [depositAmount, setDepositAmount] = useState<number>(initialDeposit);
-  const [lockDurationMonths, setLockDurationMonths] = useState<number>(initialDurationMonths);
+  const [lockDurationMonths, setLockDurationMonths] = useState<number>(() =>
+    Math.min(36, Math.max(1, Math.round(initialDurationMonths))),
+  );
   const [baseApyPercentage, setBaseApyPercentage] = useState<number>(initialBaseApy);
   const [compoundFrequency, setCompoundFrequency] = useState<string>('monthly');
   const [enableTierMultiplier, setEnableTierMultiplier] = useState<boolean>(true);
@@ -150,7 +152,17 @@ export function StakingCalculator({
               max="36"
               step="1"
               value={lockDurationMonths}
-              onChange={(e) => setLockDurationMonths(Number(e.target.value))}
+              onChange={(e) => {
+                // Keep stepping uniform (1 month) across the full 1-36 range,
+                // including above 24 months: round + clamp so the slider can
+                // never land on fractional or out-of-range values.
+                const next = Math.round(Number(e.target.value));
+                setLockDurationMonths(Math.min(36, Math.max(1, next)));
+              }}
+              aria-valuemin={1}
+              aria-valuemax={36}
+              aria-valuenow={lockDurationMonths}
+              aria-valuetext={`${lockDurationMonths} months`}
               className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-800 accent-cyan-400"
             />
             {/* Duration Presets */}

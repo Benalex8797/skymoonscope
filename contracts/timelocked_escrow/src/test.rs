@@ -234,7 +234,7 @@ fn test_release_after_cancel_fails() {
     client.release();
 }
 
-// ── 10. Guardian Rotation ─────────────────────────────────────
+// ── 10. Guardian Rotation With Time-Lock Delay ───────────────────
 
 #[test]
 fn test_guardian_rotation() {
@@ -245,7 +245,7 @@ fn test_guardian_rotation() {
     client.approve(&guardians.get(0).unwrap());
     assert_eq!(client.get_approval_count(), 1);
 
-    // Rotate with 3 current guardians authorizing
+    // Propose rotation with 3 current guardians authorizing
     let mut new_guardians = Vec::new(&e);
     for _ in 0..5 {
         new_guardians.push_back(Address::generate(&e));
@@ -256,7 +256,22 @@ fn test_guardian_rotation() {
     approving.push_back(guardians.get(1).unwrap());
     approving.push_back(guardians.get(2).unwrap());
 
-    client.rotate_guardians(&new_guardians, &approving);
+    let eta = client.propose_guardian_rotation(&new_guardians, &approving);
+    assert!(client.get_pending_guardian_rotation().is_some());
+    let pending = client.get_pending_guardian_rotation().unwrap();
+    assert_eq!(pending.eta, eta);
+    assert_eq!(pending.new_guardians.len(), 5);
+
+    // Cannot execute before timelock delay has elapsed
+    let err = client.try_execute_guardian_rotation();
+    assert_eq!(err, Err(Ok(Error::RotationTimelockNotElapsed)));
+
+    // Advance past rotation delay
+    e.ledger().with_mut(|l| l.sequence_number = eta);
+
+    // Execute rotation
+    assert_eq!(client.try_execute_guardian_rotation(), Ok(()));
+    assert!(client.get_pending_guardian_rotation().is_none());
 
     // Approvals should be reset
     assert_eq!(client.get_approval_count(), 0);
@@ -271,6 +286,87 @@ fn test_guardian_rotation() {
     assert_eq!(stored.len(), 5);
     assert_eq!(stored.get(0).unwrap(), new_guardians.get(0).unwrap());
 }
+
+#[test]
+fn test_guardian_rotation_timelock_boundaries() {
+    let (e, client, _, _, _, guardians, _) = setup();
+
+    let mut new_guardians = Vec::new(&e);
+    for _ in 0..5 {
+        new_guardians.push_back(Address::generate(&e));
+    }
+
+    let mut approving = Vec::new(&e);
+    approving.push_back(guardians.get(0).unwrap());
+    approving.push_back(guardians.get(1).unwrap());
+    approving.push_back(guardians.get(2).unwrap());
+
+    let eta = client.propose_guardian_rotation(&new_guardians, &approving);
+
+    // One ledger before eta: still not elapsed
+    e.ledger().with_mut(|l| l.sequence_number = eta - 1);
+    assert_eq!(
+        client.try_execute_guardian_rotation(),
+        Err(Ok(Error::RotationTimelockNotElapsed))
+    );
+
+    // At eta: execution succeeds
+    e.ledger().with_mut(|l| l.sequence_number = eta);
+    assert_eq!(client.try_execute_guardian_rotation(), Ok(()));
+}
+
+#[test]
+fn test_cancel_guardian_rotation_by_guardian() {
+    let (e, client, _, _, _, guardians, _) = setup();
+
+    let mut new_guardians = Vec::new(&e);
+    for _ in 0..5 {
+        new_guardians.push_back(Address::generate(&e));
+    }
+
+    let mut approving = Vec::new(&e);
+    approving.push_back(guardians.get(0).unwrap());
+    approving.push_back(guardians.get(1).unwrap());
+    approving.push_back(guardians.get(2).unwrap());
+
+    client.propose_guardian_rotation(&new_guardians, &approving);
+    assert!(client.get_pending_guardian_rotation().is_some());
+
+    // Any guardian can cancel the pending rotation
+    let canceller = guardians.get(4).unwrap();
+    client.cancel_guardian_rotation(&canceller);
+
+    // Proposal is removed
+    assert!(client.get_pending_guardian_rotation().is_none());
+
+    // Execution fails because there is no pending proposal
+    assert_eq!(
+        client.try_execute_guardian_rotation(),
+        Err(Ok(Error::NoPendingRotation))
+    );
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")]
+fn test_cancel_guardian_rotation_by_non_guardian_fails() {
+    let (e, client, _, _, _, guardians, _) = setup();
+
+    let mut new_guardians = Vec::new(&e);
+    for _ in 0..5 {
+        new_guardians.push_back(Address::generate(&e));
+    }
+
+    let mut approving = Vec::new(&e);
+    approving.push_back(guardians.get(0).unwrap());
+    approving.push_back(guardians.get(1).unwrap());
+    approving.push_back(guardians.get(2).unwrap());
+
+    client.propose_guardian_rotation(&new_guardians, &approving);
+
+    let non_guardian = Address::generate(&e);
+    client.cancel_guardian_rotation(&non_guardian);
+}
+
 
 // ── 11. Guardian Rotation Insufficient Sigs ───────────────────
 

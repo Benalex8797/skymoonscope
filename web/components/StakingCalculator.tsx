@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { calculateStakingYield } from '../lib/stakingCalculator';
-import { Calculator, TrendingUp, Calendar, Zap, DollarSign, RefreshCw, BarChart2, AlertTriangle } from 'lucide-react';
+import { CompoundInterestChart } from './CompoundInterestChart';
+import { Calculator, TrendingUp, Calendar, Zap, DollarSign, RefreshCw, BarChart2 } from 'lucide-react';
 
 export interface StakingCalculatorProps {
   initialDeposit?: number;
@@ -325,6 +326,11 @@ export function StakingCalculator({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Compound Interest Growth Chart */}
+      <div className="mt-6 border-t border-slate-800 pt-5">
+        <CompoundInterestChart result={results} />
       </div>
 
       {/* Monthly Milestone Table */}
